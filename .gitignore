@@ -1,2 +1,4 @@
-api_token.txt
+config/api_token.txt
+config/region.txt
 *.pyc
+response.json
