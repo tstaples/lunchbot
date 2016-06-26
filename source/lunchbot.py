@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import time
 import json
 import requests
+import ConfigParser
 from slackclient import SlackClient
 from foodtruck import FoodTruck
 
@@ -18,18 +19,13 @@ def readFirstLineOfFile(path):
     return text
 
 
-def getFoodTrucks():
+def getFoodTrucks(region):
     # TODO: cache response and expire once per day
-    region = readFirstLineOfFile("config/region.txt")
-    if not region:
-        print("Failed to get region from config file")
-        return []
-
     rjson = None
     try:
-        #response = requests.get("http://data.streetfoodapp.com/1.1/schedule/region")
-        #rjson = response.json()
-        rjson = json.load(open("response.json", "r")) # temp for testing so we don't spam requests
+        response = requests.get("http://data.streetfoodapp.com/1.1/schedule/" + region)
+        rjson = response.json()
+        #rjson = json.load(open("response.json", "r")) # temp for testing so we don't spam requests
     except Exception as ex:
         print("Error: " + str(ex))
         return []
@@ -49,8 +45,8 @@ def getFoodTrucks():
     return foodTrucks
 
 
-def getTodaysFoodTruck():
-    foodtrucks = getFoodTrucks()
+def getTodaysFoodTruck(region):
+    foodtrucks = getFoodTrucks(region)
     for foodtruck in foodtrucks:
         if foodtruck.isOpen():
             return foodtruck
@@ -62,8 +58,8 @@ def boldText(txt):
     return "*" + txt + "*"
 
 
-def getCurrentFoodTruckInfo():
-    foodtruck = getTodaysFoodTruck()
+def getCurrentFoodTruckInfo(region):
+    foodtruck = getTodaysFoodTruck(region)
     if not foodtruck:
         return None
     msg = boldText(foodtruck.name) + "\n"
@@ -81,7 +77,12 @@ def getValueOrDefault(arr, key, defaultValue = None):
 
 ##################################################################
 
-api_key = readFirstLineOfFile("config/api_token.txt")
+config = ConfigParser.ConfigParser()
+config.readfp(open("config/lunchbot.config"))
+api_key = config.get("API Tokens", "testing")
+region = config.get("Region", "region")
+
+#api_key = readFirstLineOfFile("config/api_token.txt")
 client = SlackClient(api_key)
 
 if client.rtm_connect():
@@ -100,7 +101,7 @@ if client.rtm_connect():
                 print("parsed = " + parsed)
 
                 if parsed and '!foodtruck' in parsed:
-                    msg = getCurrentFoodTruckInfo()
+                    msg = getCurrentFoodTruckInfo(region)
                     if not msg:
                         # TODO: show tomorrows
                         msg = "There are currently no foodtrucks open"
