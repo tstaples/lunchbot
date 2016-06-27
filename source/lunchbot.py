@@ -11,16 +11,6 @@ from foodtruck import FoodTruck
 from config import LunchbotConfig
 
 
-def readFirstLineOfFile(path):
-    text = None
-    try:
-        f = open(path, "r")
-        text = f.read()
-        f.close()
-    except Exception as ex:
-        print("Error reading file: " + str(ex))
-    return text
-
 
 def getSchedule(region):
     rjson = None
@@ -49,14 +39,14 @@ def getRegionName(rjson, region):
 
 def getFoodTrucks(region):
     # TODO: cache response and expire once per day
+    foodTrucks = []
     rjson = getSchedule(region)
     if not rjson:
-        return []
+        return foodTrucks
 
     # Get the full display name of the region
     regionDisplayName = getRegionName(rjson, region)
 
-    foodTrucks = []
     vendorsObj = rjson["vendors"]
     for vendorName in vendorsObj:
         foodTruck = FoodTruck(vendorName, vendorsObj[vendorName], regionDisplayName)
@@ -101,26 +91,29 @@ if __name__ == "__main__":
     config = LunchbotConfig()
     client = SlackClient(config.api_key)
 
-    if client.rtm_connect():
-        while True:
-            time.sleep(1)
-            last_read = client.rtm_read()
-            if last_read:
-                try:
-                    # get the message and the channel message was found in.
-                    parsed = getValueOrDefault(last_read[0], 'text')
-                    message_channel = getValueOrDefault(last_read[0], 'channel')
-                    if not parsed or not message_channel:
-                        continue
-                    
-                    print("channel = " + message_channel)
-                    print("parsed = " + parsed)
+    if not client.rtm_connect():
+        print("Failed to connect to Slack")
+        exit(1)
 
-                    if parsed and '!foodtruck' in parsed:
-                        msg = getCurrentFoodTruckInfo(config.region)
-                        if not msg:
-                            # TODO: show tomorrows
-                            msg = "There are currently no foodtrucks open"
-                        client.rtm_send_message(message_channel, msg)
-                except Exception as ex:
-                    print("Error: " + str(ex))
+    while True:
+        time.sleep(1)
+        last_read = client.rtm_read()
+        if last_read:
+            try:
+                # get the message and the channel message was found in.
+                parsed = getValueOrDefault(last_read[0], 'text')
+                message_channel = getValueOrDefault(last_read[0], 'channel')
+                if not parsed or not message_channel:
+                    continue
+                
+                print("channel = " + message_channel)
+                print("parsed = " + parsed)
+
+                if parsed and '!foodtruck' in parsed:
+                    msg = getCurrentFoodTruckInfo(config.region)
+                    if not msg:
+                        # TODO: show tomorrows
+                        msg = "There are currently no foodtrucks open"
+                    client.rtm_send_message(message_channel, msg)
+            except Exception as ex:
+                print("Error: " + str(ex))
