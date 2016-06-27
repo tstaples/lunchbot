@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import time
+import os
+import sys
 import json
 import requests
 import ConfigParser
 from slackclient import SlackClient
 from foodtruck import FoodTruck
+from config import LunchbotConfig
 
 
 def readFirstLineOfFile(path):
@@ -75,36 +78,33 @@ def getValueOrDefault(arr, key, defaultValue = None):
         return arr[key]
     return defaultValue
 
+
 ##################################################################
 
-config = ConfigParser.ConfigParser()
-config.readfp(open("config/lunchbot.config"))
-api_key = config.get("API Tokens", "testing")
-region = config.get("Region", "region")
+if __name__ == "__main__":
+    config = LunchbotConfig()
+    client = SlackClient(config.api_key)
 
-#api_key = readFirstLineOfFile("config/api_token.txt")
-client = SlackClient(api_key)
+    if client.rtm_connect():
+        while True:
+            time.sleep(1)
+            last_read = client.rtm_read()
+            if last_read:
+                try:
+                    # get the message and the channel message was found in.
+                    parsed = getValueOrDefault(last_read[0], 'text')
+                    message_channel = getValueOrDefault(last_read[0], 'channel')
+                    if not parsed or not message_channel:
+                        continue
+                    
+                    print("channel = " + message_channel)
+                    print("parsed = " + parsed)
 
-if client.rtm_connect():
-    while True:
-        time.sleep(1)
-        last_read = client.rtm_read()
-        if last_read:
-            try:
-                # get the message and the channel message was found in.
-                parsed = getValueOrDefault(last_read[0], 'text')
-                message_channel = getValueOrDefault(last_read[0], 'channel')
-                if not parsed or not message_channel:
-                    continue
-                
-                print("channel = " + message_channel)
-                print("parsed = " + parsed)
-
-                if parsed and '!foodtruck' in parsed:
-                    msg = getCurrentFoodTruckInfo(region)
-                    if not msg:
-                        # TODO: show tomorrows
-                        msg = "There are currently no foodtrucks open"
-                    client.rtm_send_message(message_channel, msg)
-            except Exception as ex:
-                print("Error: " + str(ex))
+                    if parsed and '!foodtruck' in parsed:
+                        msg = getCurrentFoodTruckInfo(config.region)
+                        if not msg:
+                            # TODO: show tomorrows
+                            msg = "There are currently no foodtrucks open"
+                        client.rtm_send_message(message_channel, msg)
+                except Exception as ex:
+                    print("Error: " + str(ex))
