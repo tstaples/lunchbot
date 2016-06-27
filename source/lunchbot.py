@@ -22,23 +22,39 @@ def readFirstLineOfFile(path):
     return text
 
 
-def getFoodTrucks(region):
-    # TODO: cache response and expire once per day
+def getSchedule(region):
     rjson = None
     try:
         response = requests.get("http://data.streetfoodapp.com/1.1/schedule/" + region)
         rjson = response.json()
         #rjson = json.load(open("response.json", "r")) # temp for testing so we don't spam requests
     except Exception as ex:
-        print("Error: " + str(ex))
+        print("Error getting schedule for region '%s': %s" % (region, str(ex)))
+    return rjson
+
+
+def getRegionName(rjson, region):
+    regionDisplayName = region
+    metadata = getValueOrDefault(rjson, "metadata")
+    if not metadata:
+        return regionDisplayName
+
+    regions = getValueOrDefault(metadata, "regions")
+    if not regions or len(regions) == 0:
+        print("Response had no region information")
+    else:
+        regionDisplayName = regions[0]["name"]
+    return regionDisplayName
+
+
+def getFoodTrucks(region):
+    # TODO: cache response and expire once per day
+    rjson = getSchedule(region)
+    if not rjson:
         return []
 
     # Get the full display name of the region
-    regionDisplayName = region
-    if "regions" not in rjson or len(rjson["regions"]) == 0:
-        print("Response had no region information")
-    else:
-        regionDisplayName = rjson["regions"][0]["name"]
+    regionDisplayName = getRegionName(rjson, region)
 
     foodTrucks = []
     vendorsObj = rjson["vendors"]
